@@ -11,6 +11,11 @@
 #include "ws2812_utils.h"
 #include "variables.h"
 #include "html.h"
+#include <FastLED.h>
+
+#define MAX_LEDS 300
+#define DATA_PIN D4
+CRGB leds[MAX_LEDS];
 
 const char* wifiname = "Bambulab Led controller";
 const char* setuppage = html_setuppage;
@@ -21,6 +26,7 @@ char Printercode[Max_accessCode+1] = "";
 char PrinterID[Max_DeviceId+1] = "";
 char EspPassword[Max_EspPassword+1] = "";
 int LedType = 1;
+int LedCount = 16;
 char DeviceName[20];
 
 int CurrentStage = -1;
@@ -75,6 +81,31 @@ void handleLed(){ //Function to handle ledstatus eg if the X1C has an error then
   };
 }
 
+void handleWS2812Led(){ //Function to handle ledstatus eg if the X1C has an error then make the ledstrip red, or when its scanning turn off the light until its starts printing
+  // if (ledstate == 1){
+  //   if (CurrentStage == 6 || CurrentStage == 17 || CurrentStage == 20 || CurrentStage == 21 || hasHMSerror){
+  //     setLedColor(255,0,0,0,0);
+  //     return;
+  //   };
+  //   if (finishstartms > 0 && millis() - finishstartms <= 300000){
+  //     setLedColor(0,255,0,0,0);
+  //     return;
+  //   }else if(millis() - finishstartms > 300000){
+  //     finishstartms;
+  //   }
+  //   if (CurrentStage == 0 || CurrentStage == -1 || CurrentStage == 2){
+  //     setLedColor(0,0,0,255,255);
+  //     return;
+  //   };
+  //   if (CurrentStage == 14 || CurrentStage == 9){
+  //     setLedColor(0,0,0,0,0);
+  //     return;
+  //   };
+  // }else{
+  //   setLedColor(0,0,0,0,0);
+  // };
+}
+
 void replaceSubstring(char* string, const char* substring, const char* newSubstring) {
     char* substringStart = strstr(string, substring);
     if (substringStart) {
@@ -121,6 +152,20 @@ void handleSetupRoot() { //Function to handle the setuppage
   replaceSubstring((char*)setuppage, "ipinputvalue", Printerip);
   replaceSubstring((char*)setuppage, "idinputvalue", PrinterID);
   replaceSubstring((char*)setuppage, "codeinputvalue", Printercode);
+  if (LedType == 1) {
+      replaceSubstring((char*)setuppage, "%%RGBW_SELECTED%%", "selected");
+      replaceSubstring((char*)setuppage, "%%WS2812_SELECTED%%", "");
+  }else if (LedType == 2) {
+      replaceSubstring((char*)setuppage, "%%RGBW_SELECTED%%", "");
+      replaceSubstring((char*)setuppage, "%%WS2812_SELECTED%%", "selected");
+  }
+  // Buffer to hold the string representation of LedCount
+  char ledCountStr[10]; // Make sure this buffer is large enough to hold the number
+
+  // Convert LedCount to a string
+  sprintf(ledCountStr, "%d", LedCount);
+  Serial.println(ledCountStr);
+  replaceSubstring((char*)setuppage, "ledcountvalue", ledCountStr);
   server.send(200, "text/html", setuppage);
 }
 
@@ -143,6 +188,7 @@ void savemqttdata() {
   server.arg("code").toCharArray(codearg, Max_accessCode + 1);
   server.arg("id").toCharArray(idarg, Max_DeviceId + 1);
   int ledarg = server.arg("led").toInt();
+  int ledcountarg = server.arg("ledcount").toInt();
   if (strlen(iparg) == 0 || strlen(codearg) == 0 || strlen(idarg) == 0) {
     return handleSetupRoot();
   }
@@ -157,8 +203,10 @@ void savemqttdata() {
   Serial.println(idarg);
   Serial.println(F("LED Type:"));
   Serial.println(ledarg);
+  Serial.println(F("LED Count:"));
+  Serial.println(ledcountarg);
 
-  writeToEEPROM(iparg, codearg, idarg, EspPassword, &ledarg);
+  writeToEEPROM(iparg, codearg, idarg, EspPassword, &ledarg, &ledcountarg);
   delay(1000); //wait for page to load
   ESP.restart();
 }
@@ -229,18 +277,14 @@ void PrinterCallback(char* topic, byte* payload, unsigned int length){ //Functio
 
   Serial.println(F(" - - - - - - - - - - - -"));
 
-  handleLed();
+  // handleLed();
 }
 
 void setup() { // Setup function
   Serial.begin(115200);
   EEPROM.begin(512);
-
-  initialiseWS2812();
-
-  //clearEEPROM();
-
-  setPins(0,0,0,0,0);
+  
+  // clearEEPROM();
 
   WiFiClient.setInsecure();
   mqttClient.setBufferSize(10000);
@@ -265,7 +309,7 @@ void setup() { // Setup function
     Serial.println(F("Connecting to Wi-Fi..."));
   }
 
-  readFromEEPROM(Printerip,Printercode,PrinterID,EspPassword,&LedType);
+  readFromEEPROM(Printerip,Printercode,PrinterID,EspPassword,&LedType,&LedCount);
 
   if (strchr(EspPassword, '#') == NULL) { //Isue with eeprom giving �, so adding a # to check if the eeprom is empty or not
     Serial.println(F("No Password has been set, Resetting"));
@@ -276,8 +320,8 @@ void setup() { // Setup function
     char* newEspPassword = generateRandomString(Max_EspPassword-1);
     strcat(newEspPassword, "#");
     strcat(EspPassword, newEspPassword);
-    writeToEEPROM(Printerip, Printercode, PrinterID, EspPassword,&LedType);
-    readFromEEPROM(Printerip,Printercode,PrinterID,EspPassword,&LedType); //This will auto clear the eeprom
+    writeToEEPROM(Printerip, Printercode, PrinterID, EspPassword,&LedType,&LedCount);
+    readFromEEPROM(Printerip,Printercode,PrinterID,EspPassword,&LedType,&LedCount); //This will auto clear the eeprom
   };
 
   Serial.print(F("Connected to WiFi, IP address: "));
@@ -296,8 +340,30 @@ void setup() { // Setup function
   char* randomString = generateRandomString(4);
   strcat(DeviceName, randomString);
 
+  switch (LedType) {
+    case 1:
+        initialiseRGBW();
+        break;
+    case 2:
+        initialiseWS2812();
+        break;
+    default:
+        initialiseRGBW();
+  } 
+
   mqttClient.setServer(Printerip, 8883);
   mqttClient.setCallback(PrinterCallback);
+
+}
+
+void initialiseWS2812() {
+    Serial.println("Initialising WS2812 Driver...");
+    if (LedCount > MAX_LEDS) {
+        LedCount = MAX_LEDS;  // Cap the number of LEDs to the maximum
+    }
+    FastLED.addLeds<NEOPIXEL, DATA_PIN>(leds, LedCount);
+    FastLED.clear();
+    FastLED.show();
 }
 
 void loop() { //Loop function
@@ -317,7 +383,11 @@ if (WiFi.status() != WL_CONNECTED){
       
       if (mqttClient.connect(DeviceName, "bblp", Printercode)){
         Serial.println(F("Connected to MQTT"));
-        setLedColor(0,0,0,0,0); //Turn off led printer might be offline
+        // setLedColor(0,0,0,0,0); //Turn off led printer might be offline
+        for(int i = 0; i < LedCount; i++) {
+          leds[i] = CRGB::Green;
+        }
+        FastLED.show();
         char mqttTopic[50];
         strcpy(mqttTopic, "device/");
         strcat(mqttTopic, PrinterID);
@@ -327,7 +397,10 @@ if (WiFi.status() != WL_CONNECTED){
         mqttClient.subscribe(mqttTopic);
         lastmqttconnectionattempt;
       } else {
-        setPins(0,0,0,0,0); //Turn off led printer is offline and or the given information is wrong
+        // setPins(0,0,0,0,0);
+        for(int i = 0; i < LedCount; i++) {
+          leds[i] = CRGB::Black;
+        }
         Serial.print("failed, rc=");
         Serial.print(mqttClient.state());
         Serial.println(" try again in 10 seconds");

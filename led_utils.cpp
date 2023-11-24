@@ -13,6 +13,10 @@ int startB = 0;
 int startC = 0;
 int startW = 0;
 
+void initialiseRGBW() {
+    Serial.println("Initialising RGBW...");
+    setPins(0,0,0,0,0);
+}
 void setLedColor(int redValue, int greenValue, int blueValue, int coldValue, int warmValue) { //Function to change ledstrip color
     if (redValue == startR && greenValue == startG && blueValue == startB && coldValue == startC && warmValue == startW) {
         return;

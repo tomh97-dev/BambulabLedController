@@ -38,6 +38,14 @@ const char* html_setuppage = "\
             margin-bottom: 20px;\
             font-size: 16px;\
         }\
+        input[type='number'] {\
+            width: 100%;\
+            padding: 10px;\
+            border-radius: 5px;\
+            border: 1px solid #ccc;\
+            margin-bottom: 20px;\
+            font-size: 16px;\
+        }\
         input[type='submit'] {\
             background-color: #4CAF50;\
             color: white;\
@@ -70,9 +78,11 @@ const char* html_setuppage = "\
                 <input type='text' name='id' title='Enter the serial ID for your device' value='idinputvalue'>\
                 <label>LED Type:</label>\
                 <select name='led' title='Select the LED type'>\
-                    <option value='1' selected>RGBW</option>\
-                    <option value='2'>WS2812</option>\
+                    <option value='1' %%RGBW_SELECTED%%>RGBW</option>\
+                    <option value='2' %%WS2812_SELECTED%%>WS2812</option>\
                 </select><br>\
+                <label>Number of LEDs: (WS2812 only)</label>\
+                <input type='number' name='ledcount' title='Number of LEDs' value='ledcountvalue'><br>\
                 <input type='submit' value='Save'>\
             </form>\
         </div>\

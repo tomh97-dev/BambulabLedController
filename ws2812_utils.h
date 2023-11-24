@@ -3,7 +3,7 @@
 
 #include <Arduino.h>
 
-void initialiseWS2812();
+// void initialiseWS2812(int ledcount);
 void setws2812Color(int redValue, int greenValue, int blueValue, int coldValue, int warmValue);
 void pulsews2812Color(int redValue, int greenValue, int blueValue, int coldValue, int warmValue);
 void setws2812Pins(int redValue, int greenValue, int blueValue, int coldValue, int warmValue);

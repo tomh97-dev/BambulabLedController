@@ -8,6 +8,7 @@
 #include <EEPROM.h>
 #include "eeprom_utils.h"
 #include "led_utils.h"
+#include "ws2812_utils.h"
 #include "variables.h"
 #include "html.h"
 
@@ -19,6 +20,7 @@ char Printerip[Max_ipLength+1] = "";
 char Printercode[Max_accessCode+1] = ""; 
 char PrinterID[Max_DeviceId+1] = "";
 char EspPassword[Max_EspPassword+1] = "";
+int LedType = 1;
 char DeviceName[20];
 
 int CurrentStage = -1;
@@ -140,7 +142,7 @@ void savemqttdata() {
   server.arg("ip").toCharArray(iparg, Max_ipLength + 1);
   server.arg("code").toCharArray(codearg, Max_accessCode + 1);
   server.arg("id").toCharArray(idarg, Max_DeviceId + 1);
-
+  int ledarg = server.arg("led").toInt();
   if (strlen(iparg) == 0 || strlen(codearg) == 0 || strlen(idarg) == 0) {
     return handleSetupRoot();
   }
@@ -153,8 +155,10 @@ void savemqttdata() {
   Serial.println(codearg);
   Serial.println(F("Printer Id:"));
   Serial.println(idarg);
+  Serial.println(F("LED Type:"));
+  Serial.println(ledarg);
 
-  writeToEEPROM(iparg, codearg, idarg, EspPassword);
+  writeToEEPROM(iparg, codearg, idarg, EspPassword, &ledarg);
   delay(1000); //wait for page to load
   ESP.restart();
 }
@@ -232,6 +236,8 @@ void setup() { // Setup function
   Serial.begin(115200);
   EEPROM.begin(512);
 
+  initialiseWS2812();
+
   //clearEEPROM();
 
   setPins(0,0,0,0,0);
@@ -259,7 +265,7 @@ void setup() { // Setup function
     Serial.println(F("Connecting to Wi-Fi..."));
   }
 
-  readFromEEPROM(Printerip,Printercode,PrinterID,EspPassword);
+  readFromEEPROM(Printerip,Printercode,PrinterID,EspPassword,&LedType);
 
   if (strchr(EspPassword, '#') == NULL) { //Isue with eeprom giving �, so adding a # to check if the eeprom is empty or not
     Serial.println(F("No Password has been set, Resetting"));
@@ -270,8 +276,8 @@ void setup() { // Setup function
     char* newEspPassword = generateRandomString(Max_EspPassword-1);
     strcat(newEspPassword, "#");
     strcat(EspPassword, newEspPassword);
-    writeToEEPROM(Printerip, Printercode, PrinterID, EspPassword);
-    readFromEEPROM(Printerip,Printercode,PrinterID,EspPassword); //This will auto clear the eeprom
+    writeToEEPROM(Printerip, Printercode, PrinterID, EspPassword,&LedType);
+    readFromEEPROM(Printerip,Printercode,PrinterID,EspPassword,&LedType); //This will auto clear the eeprom
   };
 
   Serial.print(F("Connected to WiFi, IP address: "));

@@ -21,7 +21,7 @@ void removeUnderscores(char* text) { //Removes underscores from message
   }
 }
 
-void readFromEEPROM(char* Printerip, char* Printercode, char* PrinterID, char* EspPassword) { //Function to write the PrinterID, Printerip and AccessCode to the eeprom
+void readFromEEPROM(char* Printerip, char* Printercode, char* PrinterID, char* EspPassword, int* LedType) { //Function to write the PrinterID, Printerip and AccessCode to the eeprom
 
   Serial.println("Reading from eeprom");
   char Parsedipeeprom[Max_ipLength+1] = "";
@@ -56,10 +56,16 @@ void readFromEEPROM(char* Printerip, char* Printercode, char* PrinterID, char* E
   }
   ParsedEspPassword[Max_EspPassword] = '\0';
 
+  // Reading integer value for LedType
+  byte lowByte = EEPROM.read(LedType_Address);
+  byte highByte = EEPROM.read(LedType_Address + 1);
+  *LedType = (highByte << 8) | lowByte;
+
   Serial.println(Parsedipeeprom);
   Serial.println(Parsedcodeeprom);
   Serial.println(ParsedIdeeprom);
   Serial.println(ParsedEspPassword);
+  Serial.println(*LedType);
 
   strcpy(Printerip, Parsedipeeprom);
   strcpy(Printercode, Parsedcodeeprom);
@@ -67,7 +73,7 @@ void readFromEEPROM(char* Printerip, char* Printercode, char* PrinterID, char* E
   strcpy(EspPassword, ParsedEspPassword);
 }
 
-void writeToEEPROM(char* Printerip, char* Printercode, char* PrinterID, char* EspPassword) { //Function to read the PrinterID, Printerip and AccessCode from the eeprom
+void writeToEEPROM(char* Printerip, char* Printercode, char* PrinterID, char* EspPassword, int* LedType) { //Function to read the PrinterID, Printerip and AccessCode from the eeprom
     int ipLength = strlen(Printerip);
     int codeLength = strlen(Printercode);
     int idLength = strlen(PrinterID);
@@ -87,6 +93,7 @@ void writeToEEPROM(char* Printerip, char* Printercode, char* PrinterID, char* Es
     Serial.println(parsediparg);
     Serial.println(parsedcodearg);
     Serial.println(parsedID);
+    Serial.println(*LedType);
 
     Serial.println("Writing to eeprom");
 
@@ -105,6 +112,12 @@ void writeToEEPROM(char* Printerip, char* Printercode, char* PrinterID, char* Es
     for (int i = 0; i < strlen(EspPassword); i++) {
         EEPROM.write(EspPassword_Adress + i, EspPassword[i]);
     }
+
+    // Writing integer value for LedType
+    byte lowByte = *LedType & 0xFF;
+    byte highByte = (*LedType >> 8) & 0xFF;
+    EEPROM.write(LedType_Address, lowByte);
+    EEPROM.write(LedType_Address + 1, highByte);
 
     EEPROM.commit();
 

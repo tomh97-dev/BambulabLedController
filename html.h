@@ -67,7 +67,12 @@ const char* html_setuppage = "\
                 <label>Access Code:</label>\
                 <input type='text' name='code' title='Enter the access code for your MQTT broker' value='codeinputvalue'><br>\
                 <label>Serial ID:</label>\
-                <input type='text' name='id' title='Enter the serial ID for your device' value='idinputvalue'><br>\
+                <input type='text' name='id' title='Enter the serial ID for your device' value='idinputvalue'>\
+                <label>LED Type:</label>\
+                <select name='led' title='Select the LED type'>\
+                    <option value='1' selected>RGBW</option>\
+                    <option value='2'>WS2812</option>\
+                </select><br>\
                 <input type='submit' value='Save'>\
             </form>\
         </div>\

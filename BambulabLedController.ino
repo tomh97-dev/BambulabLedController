@@ -67,6 +67,10 @@ void handleLed(){ //Function to handle ledstatus eg if the X1C has an error then
       setLedColor(255,0,0,0,0);
       return;
     };
+    if (isHeating){
+      setLedColor(255,0,0,0,0);
+      return;
+    };
     if (finishstartms > 0 && millis() - finishstartms <= 300000){
       setLedColor(0,255,0,0,0);
       return;
@@ -122,24 +126,27 @@ void handleWS2812Led(){ //Function to handle ledstatus eg if the X1C has an erro
 
 void fadeAnimation(int red, int green, int blue){
   float r, g, b;
-  // FADE IN
-  for(int i = 0; i <= 255; i++) {
-    r = (i/256.0)*red;
-    g = (i/256.0)*green;
-    b = (i/256.0)*blue;
-    fill_solid(leds, LedCount, CRGB(r, g, b));
-    FastLED.show();
-    delay(2);
-  }
+  for (int i = 0; i < 2; i++)
+  {
+    // FADE IN
+    for(int i = 0; i <= 255; i++) {
+      r = (i/256.0)*red;
+      g = (i/256.0)*green;
+      b = (i/256.0)*blue;
+      fill_solid(leds, LedCount, CRGB(r, g, b));
+      FastLED.show();
+      delay(2);
+    }
 
-  // FADE OUT
-  for(int i = 255; i >= 0; i--) {
-    r = (i/256.0)*red;
-    g = (i/256.0)*green;
-    b = (i/256.0)*blue;
-    fill_solid(leds, LedCount, CRGB(r, g, b));
-    FastLED.show();
-    delay(2);
+    // FADE OUT
+    for(int i = 255; i >= 0; i--) {
+      r = (i/256.0)*red;
+      g = (i/256.0)*green;
+      b = (i/256.0)*blue;
+      fill_solid(leds, LedCount, CRGB(r, g, b));
+      FastLED.show();
+      delay(2);
+    }
   }
 }
 

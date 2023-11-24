@@ -8,7 +8,7 @@
 #include <EEPROM.h>
 #include "eeprom_utils.h"
 #include "led_utils.h"
-#include "ws2812_utils.h"
+// #include "ws2812_utils.h"
 #include "variables.h"
 #include "html.h"
 #include <FastLED.h>
@@ -30,6 +30,11 @@ int LedCount = 16;
 char DeviceName[20];
 
 int CurrentStage = -1;
+bool isHeating = false;
+float bedTargetTemp = 0;
+float nozzleTargetTemp = 0;
+float lastBedTemp = 0.0;
+float lastNozzleTemp = 0.0;
 bool hasHMSerror = false;
 bool ledstate = false;
 unsigned long finishstartms;
@@ -82,28 +87,60 @@ void handleLed(){ //Function to handle ledstatus eg if the X1C has an error then
 }
 
 void handleWS2812Led(){ //Function to handle ledstatus eg if the X1C has an error then make the ledstrip red, or when its scanning turn off the light until its starts printing
-  // if (ledstate == 1){
-  //   if (CurrentStage == 6 || CurrentStage == 17 || CurrentStage == 20 || CurrentStage == 21 || hasHMSerror){
-  //     setLedColor(255,0,0,0,0);
-  //     return;
-  //   };
-  //   if (finishstartms > 0 && millis() - finishstartms <= 300000){
-  //     setLedColor(0,255,0,0,0);
-  //     return;
-  //   }else if(millis() - finishstartms > 300000){
-  //     finishstartms;
-  //   }
-  //   if (CurrentStage == 0 || CurrentStage == -1 || CurrentStage == 2){
-  //     setLedColor(0,0,0,255,255);
-  //     return;
-  //   };
-  //   if (CurrentStage == 14 || CurrentStage == 9){
-  //     setLedColor(0,0,0,0,0);
-  //     return;
-  //   };
-  // }else{
-  //   setLedColor(0,0,0,0,0);
-  // };
+  if (ledstate == 1){
+    if (CurrentStage == 6 || CurrentStage == 17 || CurrentStage == 20 || CurrentStage == 21 || hasHMSerror){
+      fadeAnimation(255,0,0);
+      return;
+    };
+    if (isHeating)
+    {
+      fadeAnimation(255,113,0);
+      return;
+    }
+    if (finishstartms > 0 && millis() - finishstartms <= 300000){
+      fadeAnimation(0,255,0);
+      return;
+    }else if(millis() - finishstartms > 300000){
+      finishstartms;
+    }
+    if (CurrentStage == 0 || CurrentStage == -1 || CurrentStage == 2){
+      FastLED.setTemperature( Tungsten100W ); // first temperature
+      for(int i = 0; i < LedCount; i++) {leds[i] = Tungsten100W; } // WHITE
+      FastLED.show();
+      return;
+    };
+    if (CurrentStage == 14 || CurrentStage == 9){
+      for(int i = 0; i < LedCount; i++) {leds[i] = CRGB::Black; } // OFF
+      FastLED.show();
+      return;
+    };
+  }else{
+    for(int i = 0; i < LedCount; i++) {leds[i] = CRGB::Black; } // OFF
+    FastLED.show();
+  };
+}
+
+void fadeAnimation(int red, int green, int blue){
+  float r, g, b;
+  // FADE IN
+  for(int i = 0; i <= 255; i++) {
+    r = (i/256.0)*red;
+    g = (i/256.0)*green;
+    b = (i/256.0)*blue;
+    fill_solid(leds, LedCount, CRGB(r, g, b));
+    FastLED.show();
+    delay(2);
+  }
+
+  // FADE OUT
+  for(int i = 255; i >= 0; i--) {
+    r = (i/256.0)*red;
+    g = (i/256.0)*green;
+    b = (i/256.0)*blue;
+    fill_solid(leds, LedCount, CRGB(r, g, b));
+    FastLED.show();
+    delay(2);
+  }
 }
 
 void replaceSubstring(char* string, const char* substring, const char* newSubstring) {
@@ -192,7 +229,6 @@ void savemqttdata() {
   if (strlen(iparg) == 0 || strlen(codearg) == 0 || strlen(idarg) == 0) {
     return handleSetupRoot();
   }
-
   server.send(200, "text/html", finishedpage);
 
   Serial.println(F("Printer IP:"));
@@ -240,6 +276,23 @@ void PrinterCallback(char* topic, byte* payload, unsigned int length){ //Functio
     CurrentStage = doc["print"]["stg_cur"];
   }
 
+  if (doc["print"].containsKey("bed_temper")){
+    lastBedTemp = doc["print"]["bed_temper"];
+  }
+  if (doc["print"].containsKey("nozzle_temper")){
+    lastNozzleTemp = doc["print"]["nozzle_temper"];
+  }
+
+  if (doc["print"].containsKey("bed_target_temper")){
+    bedTargetTemp = doc["print"]["bed_target_temper"];
+  }
+
+  if (doc["print"].containsKey("nozzle_target_temper")){
+    nozzleTargetTemp = doc["print"]["nozzle_target_temper"];
+  }
+
+  if (lastBedTemp != 0.0 && lastNozzleTemp != 0.0) isHeating = (bedTargetTemp > lastBedTemp + 1.0) || (nozzleTargetTemp > lastNozzleTemp + 1.0);
+
   Serial.print(F("stg_cur: "));
   Serial.println(CurrentStage);
 
@@ -274,10 +327,22 @@ void PrinterCallback(char* topic, byte* payload, unsigned int length){ //Functio
   Serial.print(F("cur_led: "));
   Serial.println(ledstate);
 
+  Serial.print(F("is heating: "));
+  Serial.println(isHeating);
+
 
   Serial.println(F(" - - - - - - - - - - - -"));
-
-  // handleLed();
+  switch (LedType) {
+    case 1:
+        handleLed();
+        break;
+    case 2:
+        handleWS2812Led();
+        break;
+    default:
+        handleLed();
+  } 
+  
 }
 
 void setup() { // Setup function
@@ -362,18 +427,17 @@ void initialiseWS2812() {
         LedCount = MAX_LEDS;  // Cap the number of LEDs to the maximum
     }
     FastLED.addLeds<NEOPIXEL, DATA_PIN>(leds, LedCount);
-    FastLED.clear();
-    FastLED.show();
+    FastLED.setMaxPowerInVoltsAndMilliamps(5, 2000); 
 }
 
 void loop() { //Loop function
   server.handleClient();
-if (WiFi.status() != WL_CONNECTED){
-    Serial.println(F("Connection lost! Reconnecting..."));
-    //wifiManager.autoConnect(wifiname);
-    //Serial.println(F("Connected to WiFi!"));
-    ESP.restart();
-}
+  if (WiFi.status() != WL_CONNECTED){
+      Serial.println(F("Connection lost! Reconnecting..."));
+      //wifiManager.autoConnect(wifiname);
+      //Serial.println(F("Connected to WiFi!"));
+      ESP.restart();
+  }
   if (WiFi.status() == WL_CONNECTED && strlen(Printerip) > 0 && (lastmqttconnectionattempt <= 0 || millis() - lastmqttconnectionattempt >= 10000)){
     if (!mqttClient.connected()) {
 
@@ -384,10 +448,7 @@ if (WiFi.status() != WL_CONNECTED){
       if (mqttClient.connect(DeviceName, "bblp", Printercode)){
         Serial.println(F("Connected to MQTT"));
         // setLedColor(0,0,0,0,0); //Turn off led printer might be offline
-        for(int i = 0; i < LedCount; i++) {
-          leds[i] = CRGB::Green;
-        }
-        FastLED.show();
+        for(int i = 0; i < LedCount; i++) {leds[i] = CRGB::Black;}
         char mqttTopic[50];
         strcpy(mqttTopic, "device/");
         strcat(mqttTopic, PrinterID);
@@ -398,9 +459,7 @@ if (WiFi.status() != WL_CONNECTED){
         lastmqttconnectionattempt;
       } else {
         // setPins(0,0,0,0,0);
-        for(int i = 0; i < LedCount; i++) {
-          leds[i] = CRGB::Black;
-        }
+        for(int i = 0; i < LedCount; i++) {leds[i] = CRGB::Black;}
         Serial.print("failed, rc=");
         Serial.print(mqttClient.state());
         Serial.println(" try again in 10 seconds");
@@ -410,4 +469,6 @@ if (WiFi.status() != WL_CONNECTED){
   }
   //Serial.printf("Free heap: %u\n", ESP.getFreeHeap());
   mqttClient.loop();
+  // FastLED.show();
+  // delay(50);
 }

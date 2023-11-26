@@ -15,4 +15,14 @@ const int EspPassword_Adress = 38;
 const int LedType_Address = 46;
 const int LedCount_Address = 48;
 
+enum LedState {
+  IDLE,
+  PREHEATING,
+  PRINTING,
+  ERROR,
+  ERROR_RESOLVED,
+  PRINT_COMPLETE,
+  OFF
+};
+
 #endif

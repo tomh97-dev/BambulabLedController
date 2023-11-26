@@ -29,7 +29,9 @@ int LedType = 1;
 int LedCount = 16;
 char DeviceName[20];
 
+LedState currentLedState = IDLE;
 int CurrentStage = -1;
+bool isPrinting = false;
 bool isHeating = false;
 float bedTargetTemp = 0;
 float nozzleTargetTemp = 0;
@@ -61,7 +63,54 @@ char* generateRandomString(int length) {
   return randomString;
 }
 
-void handleLed(){ //Function to handle ledstatus eg if the X1C has an error then make the ledstrip red, or when its scanning turn off the light until its starts printing
+void updateFastLED() {
+  static unsigned long lastUpdate = 0;
+  const long interval = 1000; // Example interval
+
+  if (millis() - lastUpdate >= interval) {
+    lastUpdate = millis();
+    if (ledstate == 1 && currentLedState != ERROR) { // Always illuminate for errors?
+      switch (currentLedState) {
+        case IDLE:
+          fill_solid(leds, LedCount, CRGB(255, 255, 255));
+          FastLED.show();
+          break;
+        case PREHEATING:
+          fadeAnimation(255,113,0);
+          break;
+        case PRINTING:
+          fadeAnimation(0,0,255);
+          // fill_solid(leds, LedCount, CRGB(255, 255, 255));
+          // FastLED.show();
+          break;
+        case ERROR:
+          fadeAnimation(255,0,0);
+          break;
+        case ERROR_RESOLVED:
+          fadeAnimation(255,0,0);
+          fadeAnimation(0,255,0);
+          break;
+        case PRINT_COMPLETE:
+          for (int i=0; i > 10; i++) fadeAnimation(0,255,0);
+          break;
+        case OFF:
+          fill_solid(leds, LedCount, CRGB::Black);
+          FastLED.show();
+          break;
+        default:
+          fill_solid(leds, LedCount, CRGB::White);
+          FastLED.show();
+      }
+    }
+  }
+  else
+  {
+    fill_solid(leds, LedCount, CRGB::Black);
+    FastLED.show();
+  }
+}
+
+void updateRGBWLed(){ //Function to handle ledstatus eg if the X1C has an error then make the ledstrip red, or when its scanning turn off the light until its starts printing
   if (ledstate == 1){
     if (CurrentStage == 6 || CurrentStage == 17 || CurrentStage == 20 || CurrentStage == 21 || hasHMSerror){
       setLedColor(255,0,0,0,0);
@@ -88,65 +137,95 @@ void handleLed(){ //Function to handle ledstatus eg if the X1C has an error then
   }else{
     setLedColor(0,0,0,0,0);
   };
+
+  if (ledstate == 1 && currentLedState != ERROR) { // Always illuminate for errors?
+      switch (currentLedState) {
+        case IDLE:
+          setLedColor(0,0,0,255,255);
+          break;
+        case PREHEATING:
+          setLedColor(255,113,0,0,0);
+          break;
+        case PRINTING:
+          setLedColor(0,0,0,255,255);
+          break;
+        case ERROR:
+          setLedColor(255,0,0,0,0);
+          break;
+        // case ERROR_RESOLVED:
+        //   setLedColor(0,0,0,255,255);
+        //   break;
+        case PRINT_COMPLETE:
+          setLedColor(0,255,0,0,0);
+          break;
+        case OFF:
+          setLedColor(0,0,0,0,0);
+          break;
+        default:
+          fill_solid(leds, LedCount, CRGB::White);
+          FastLED.show();
+      }
+    }
+    else setLedColor(0,0,0,0,0);
 }
 
-void handleWS2812Led(){ //Function to handle ledstatus eg if the X1C has an error then make the ledstrip red, or when its scanning turn off the light until its starts printing
-  if (ledstate == 1){
-    if (CurrentStage == 6 || CurrentStage == 17 || CurrentStage == 20 || CurrentStage == 21 || hasHMSerror){
-      fadeAnimation(255,0,0);
-      return;
-    };
-    if (isHeating)
-    {
-      fadeAnimation(255,113,0);
-      return;
-    }
-    if (finishstartms > 0 && millis() - finishstartms <= 300000){
-      fadeAnimation(0,255,0);
-      return;
-    }else if(millis() - finishstartms > 300000){
-      finishstartms;
-    }
-    if (CurrentStage == 0 || CurrentStage == -1 || CurrentStage == 2){
-      FastLED.setTemperature( Tungsten100W ); // first temperature
-      for(int i = 0; i < LedCount; i++) {leds[i] = Tungsten100W; } // WHITE
-      FastLED.show();
-      return;
-    };
-    if (CurrentStage == 14 || CurrentStage == 9){
-      for(int i = 0; i < LedCount; i++) {leds[i] = CRGB::Black; } // OFF
-      FastLED.show();
-      return;
-    };
-  }else{
-    for(int i = 0; i < LedCount; i++) {leds[i] = CRGB::Black; } // OFF
-    FastLED.show();
+void parseStages() {
+  if (CurrentStage == 6 || CurrentStage == 17 || CurrentStage == 20 || CurrentStage == 21 || hasHMSerror){
+    currentLedState = ERROR;
+    return;
   };
+  if (isPrinting)
+  {
+    currentLedState = PRINTING;
+    return;
+  }
+  if (isHeating)
+  {
+    currentLedState = PREHEATING;
+    return;
+  }
+  if (CurrentStage == 255)
+  {
+    currentLedState = PRINT_COMPLETE;
+    return;
+  }
+  if (finishstartms > 0 && millis() - finishstartms <= 300000){
+    currentLedState = PRINT_COMPLETE;
+    return;
+  }else if(millis() - finishstartms > 300000){
+    finishstartms;
+  }
+  if (CurrentStage == 0 || CurrentStage == -1 || CurrentStage == 2){
+    currentLedState = IDLE;
+    return;
+  };
+  if (CurrentStage == 14 || CurrentStage == 9){
+    currentLedState = OFF;
+    return;
+  };
+  Serial.println(currentLedState);
 }
 
 void fadeAnimation(int red, int green, int blue){
   float r, g, b;
-  for (int i = 0; i < 2; i++)
-  {
-    // FADE IN
-    for(int i = 0; i <= 255; i++) {
-      r = (i/256.0)*red;
-      g = (i/256.0)*green;
-      b = (i/256.0)*blue;
-      fill_solid(leds, LedCount, CRGB(r, g, b));
-      FastLED.show();
-      delay(2);
-    }
+  // FADE IN
+  for(int i = 0; i <= 255; i++) {
+    r = (i/256.0)*red;
+    g = (i/256.0)*green;
+    b = (i/256.0)*blue;
+    fill_solid(leds, LedCount, CRGB(r, g, b));
+    FastLED.show();
+    delay(2);
+  }
 
-    // FADE OUT
-    for(int i = 255; i >= 0; i--) {
-      r = (i/256.0)*red;
-      g = (i/256.0)*green;
-      b = (i/256.0)*blue;
-      fill_solid(leds, LedCount, CRGB(r, g, b));
-      FastLED.show();
-      delay(2);
-    }
+  // FADE OUT
+  for(int i = 255; i >= 0; i--) {
+    r = (i/256.0)*red;
+    g = (i/256.0)*green;
+    b = (i/256.0)*blue;
+    fill_solid(leds, LedCount, CRGB(r, g, b));
+    FastLED.show();
+    delay(2);
   }
 }
 
@@ -208,7 +287,6 @@ void handleSetupRoot() { //Function to handle the setuppage
 
   // Convert LedCount to a string
   sprintf(ledCountStr, "%d", LedCount);
-  Serial.println(ledCountStr);
   replaceSubstring((char*)setuppage, "ledcountvalue", ledCountStr);
   server.send(200, "text/html", setuppage);
 }
@@ -256,6 +334,7 @@ void savemqttdata() {
 
 
 void PrinterCallback(char* topic, byte* payload, unsigned int length){ //Function to handle the MQTT Data from the mqtt broker
+  Serial.printf("Free heap: %u\n", ESP.getFreeHeap());
   Serial.print(F("Message arrived in topic: "));
   Serial.println(topic);
   Serial.print(F("Message Length: "));
@@ -300,6 +379,11 @@ void PrinterCallback(char* topic, byte* payload, unsigned int length){ //Functio
 
   if (lastBedTemp != 0.0 && lastNozzleTemp != 0.0) isHeating = (bedTargetTemp > lastBedTemp + 1.0) || (nozzleTargetTemp > lastNozzleTemp + 1.0);
 
+  if (doc["print"].containsKey("mc_print_line_number")){
+    isPrinting = true;
+  }
+  else isPrinting = false;
+
   Serial.print(F("stg_cur: "));
   Serial.println(CurrentStage);
 
@@ -337,19 +421,11 @@ void PrinterCallback(char* topic, byte* payload, unsigned int length){ //Functio
   Serial.print(F("is heating: "));
   Serial.println(isHeating);
 
+  Serial.print(F("is printing: "));
+  Serial.println(isPrinting);
 
   Serial.println(F(" - - - - - - - - - - - -"));
-  switch (LedType) {
-    case 1:
-        handleLed();
-        break;
-    case 2:
-        handleWS2812Led();
-        break;
-    default:
-        handleLed();
-  } 
-  
+  parseStages();
 }
 
 void setup() { // Setup function
@@ -417,7 +493,7 @@ void setup() { // Setup function
         initialiseRGBW();
         break;
     case 2:
-        initialiseWS2812();
+        initialiseFastLED();
         break;
     default:
         initialiseRGBW();
@@ -428,13 +504,13 @@ void setup() { // Setup function
 
 }
 
-void initialiseWS2812() {
+void initialiseFastLED() {
     Serial.println("Initialising WS2812 Driver...");
     if (LedCount > MAX_LEDS) {
         LedCount = MAX_LEDS;  // Cap the number of LEDs to the maximum
     }
     FastLED.addLeds<NEOPIXEL, DATA_PIN>(leds, LedCount);
-    FastLED.setMaxPowerInVoltsAndMilliamps(5, 2000); 
+    FastLED.setMaxPowerInVoltsAndMilliamps(5, 2000);
 }
 
 void loop() { //Loop function
@@ -454,7 +530,7 @@ void loop() { //Loop function
       
       if (mqttClient.connect(DeviceName, "bblp", Printercode)){
         Serial.println(F("Connected to MQTT"));
-        // setLedColor(0,0,0,0,0); //Turn off led printer might be offline
+        if (LedType == 1) setLedColor(0,0,0,0,0); //Turn off led printer might be offline
         for(int i = 0; i < LedCount; i++) {leds[i] = CRGB::Black;}
         char mqttTopic[50];
         strcpy(mqttTopic, "device/");
@@ -465,7 +541,7 @@ void loop() { //Loop function
         mqttClient.subscribe(mqttTopic);
         lastmqttconnectionattempt;
       } else {
-        // setPins(0,0,0,0,0);
+        if (LedType == 1) setPins(0,0,0,0,0);
         for(int i = 0; i < LedCount; i++) {leds[i] = CRGB::Black;}
         Serial.print("failed, rc=");
         Serial.print(mqttClient.state());
@@ -474,7 +550,7 @@ void loop() { //Loop function
       }
     }
   }
-  //Serial.printf("Free heap: %u\n", ESP.getFreeHeap());
+  updateFastLED();
   mqttClient.loop();
   // FastLED.show();
   // delay(50);

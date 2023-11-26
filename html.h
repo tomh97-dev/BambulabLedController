@@ -79,7 +79,7 @@ const char* html_setuppage = "\
                 <label>LED Type:</label>\
                 <select name='led' title='Select the LED type'>\
                     <option value='1' %%RGBW_SELECTED%%>RGBW</option>\
-                    <option value='2' %%WS2812_SELECTED%%>WS2812</option>\
+                    <option value='2' %%WS2812_SELECTED%%>NEOPIXEL</option>\
                 </select><br>\
                 <label>Number of LEDs: (WS2812 only)</label>\
                 <input type='number' name='ledcount' title='Number of LEDs' value='ledcountvalue'><br>\

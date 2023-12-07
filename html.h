@@ -30,6 +30,14 @@ const char* html_setuppage = "\
             font-size: 16px;\
             color: #333;\
         }\
+        select {\
+            width: 100%;\
+            padding: 10px;\
+            border-radius: 5px;\
+            border: 1px solid #ccc;\
+            margin-bottom: 20px;\
+            font-size: 16px;\
+        }\
         input[type='text'] {\
             width: 100%;\
             padding: 10px;\
@@ -81,7 +89,7 @@ const char* html_setuppage = "\
                     <option value='1' %%RGBW_SELECTED%%>RGBW</option>\
                     <option value='2' %%WS2812_SELECTED%%>NEOPIXEL</option>\
                 </select><br>\
-                <label>Number of LEDs: (WS2812 only)</label>\
+                <label>Number of LEDs: (NEOPIXEL only)</label>\
                 <input type='number' name='ledcount' title='Number of LEDs' value='ledcountvalue'><br>\
                 <input type='submit' value='Save'>\
             </form>\

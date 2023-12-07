@@ -79,9 +79,8 @@ void updateFastLED() {
           fadeAnimation(255,113,0);
           break;
         case PRINTING:
-          fadeAnimation(0,0,255);
-          // fill_solid(leds, LedCount, CRGB(255, 255, 255));
-          // FastLED.show();
+          fill_solid(leds, LedCount, CRGB(255, 255, 255));
+          FastLED.show();
           break;
         case ERROR:
           fadeAnimation(255,0,0);
@@ -102,71 +101,50 @@ void updateFastLED() {
           FastLED.show();
       }
     }
-  }
-  else
-  {
-    fill_solid(leds, LedCount, CRGB::Black);
-    FastLED.show();
+    else
+    {
+      fill_solid(leds, LedCount, CRGB::Black);
+      FastLED.show();
+    }
   }
 }
 
 void updateRGBWLed(){ //Function to handle ledstatus eg if the X1C has an error then make the ledstrip red, or when its scanning turn off the light until its starts printing
-  if (ledstate == 1){
-    if (CurrentStage == 6 || CurrentStage == 17 || CurrentStage == 20 || CurrentStage == 21 || hasHMSerror){
-      setLedColor(255,0,0,0,0);
-      return;
-    };
-    if (isHeating){
-      setLedColor(255,0,0,0,0);
-      return;
-    };
-    if (finishstartms > 0 && millis() - finishstartms <= 300000){
-      setLedColor(0,255,0,0,0);
-      return;
-    }else if(millis() - finishstartms > 300000){
-      finishstartms;
-    }
-    if (CurrentStage == 0 || CurrentStage == -1 || CurrentStage == 2){
-      setLedColor(0,0,0,255,255);
-      return;
-    };
-    if (CurrentStage == 14 || CurrentStage == 9){
-      setLedColor(0,0,0,0,0);
-      return;
-    };
-  }else{
-    setLedColor(0,0,0,0,0);
-  };
+static unsigned long lastUpdate = 0;
+  const long interval = 500; // Example interval
 
-  if (ledstate == 1 && currentLedState != ERROR) { // Always illuminate for errors?
-      switch (currentLedState) {
-        case IDLE:
-          setLedColor(0,0,0,255,255);
-          break;
-        case PREHEATING:
-          setLedColor(255,113,0,0,0);
-          break;
-        case PRINTING:
-          setLedColor(0,0,0,255,255);
-          break;
-        case ERROR:
-          setLedColor(255,0,0,0,0);
-          break;
-        // case ERROR_RESOLVED:
-        //   setLedColor(0,0,0,255,255);
-        //   break;
-        case PRINT_COMPLETE:
-          setLedColor(0,255,0,0,0);
-          break;
-        case OFF:
-          setLedColor(0,0,0,0,0);
-          break;
-        default:
-          fill_solid(leds, LedCount, CRGB::White);
-          FastLED.show();
+  if (millis() - lastUpdate >= interval) {
+    lastUpdate = millis();
+    if (ledstate == 1 && currentLedState != ERROR) { // Always illuminate for errors?
+        switch (currentLedState) {
+          case IDLE:
+            setLedColor(0,0,0,255,255);
+            break;
+          case PREHEATING:
+            setLedColor(255,113,0,0,0);
+            break;
+          case PRINTING:
+            setLedColor(0,0,0,255,255);
+            break;
+          case ERROR:
+            setLedColor(255,0,0,0,0);
+            break;
+          // case ERROR_RESOLVED:
+          //   setLedColor(0,0,0,255,255);
+          //   break;
+          case PRINT_COMPLETE:
+            setLedColor(0,255,0,0,0);
+            break;
+          case OFF:
+            setLedColor(0,0,0,0,0);
+            break;
+          default:
+            fill_solid(leds, LedCount, CRGB::White);
+            FastLED.show();
+        }
       }
-    }
-    else setLedColor(0,0,0,0,0);
+      else setLedColor(0,0,0,0,0);
+  }
 }
 
 void parseStages() {
@@ -552,6 +530,4 @@ void loop() { //Loop function
   }
   updateFastLED();
   mqttClient.loop();
-  // FastLED.show();
-  // delay(50);
 }
